@@ -1,12 +1,22 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  define: {
-    // Defines env vars so they are available in the built app on Vercel without extra config
-    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify("https://Jtfwjbipjyzywrnlwsnf.supabase.co"),
-    'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0ZndqYmlwanl6eXdybmx3c25mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1MTM0MTcsImV4cCI6MjA3OTA4OTQxN30.nZCWVKecT_HHzQN1b7syXuNzErkrvFHKyT8YR802cDo"),
-  }
+export default defineConfig(({ mode }) => {
+  // Carga las variables de entorno basadas en el modo actual
+  // El tercer parámetro '' carga todas las variables sin filtrar por prefijo VITE_
+  const env = loadEnv(mode, process.cwd(), '');
+
+  return {
+    plugins: [react()],
+    define: {
+      // Mapea GEMINI_API_KEY (del .env) a process.env.API_KEY para el SDK @google/genai
+      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.API_KEY || ''),
+      
+      // Aseguramos que las variables de Supabase estén disponibles globalmente si fallan otras cargas
+      // pero priorizando las del archivo .env
+      'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
+      'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
+    }
+  };
 });
