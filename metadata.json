@@ -1,0 +1,5 @@
+{
+  "name": "POS Honduras",
+  "description": "Sistema de gestión de ventas, inventario y contabilidad para Honduras en Lempiras (HNL).",
+  "requestFramePermissions": []
+}
