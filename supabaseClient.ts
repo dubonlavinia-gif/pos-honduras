@@ -1,4 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './api_keys/keys';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Esto busca las llaves en la configuración de Vercel
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Verificación de seguridad
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('¡Faltan las llaves! Revisa las Variables de Entorno en Vercel.');
+}
+
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
