@@ -7,7 +7,7 @@ interface ConfigurationProps {
 
 export const Configuration: React.FC<ConfigurationProps> = ({ notify }) => {
   const [companyInfo, setCompanyInfo] = useState({
-    name: 'Taller y Repuestos Generales',
+    name: 'POS Honduras',
     address: 'Tegucigalpa, Honduras',
     phone: '+504 9999-9999',
     rtn: '0801-1990-123456'

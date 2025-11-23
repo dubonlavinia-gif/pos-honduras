@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getSales, getExpenses, getProducts, getPurchases, getInitialInventory } from '../services/db';
 import { Sale, Expense, Product, Purchase, InitialInventory } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, DollarSign, Wallet, BrainCircuit, FileDown } from 'lucide-react';
+import { TrendingUp, Wallet, BrainCircuit, FileDown } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -90,12 +90,12 @@ export const Dashboard: React.FC = () => {
         Actúa como contador experto para un taller y venta de repuestos en Honduras.
         Analiza este Estado de Resultados (Moneda HNL):
         
-        1. INGRESOS: L. ${ingresosTotales.toFixed(2)}
-        2. COSTO DE VENTAS: L. ${costoDeVentasReal.toFixed(2)}
+        1. INGRESOS: Lp. ${ingresosTotales.toFixed(2)}
+        2. COSTO DE VENTAS: Lp. ${costoDeVentasReal.toFixed(2)}
            (Calculado como: Inv. Inicial ${valorInventarioInicial} + Compras ${comprasNetas} - Inv. Final ${valorInventarioFinal})
-        3. UTILIDAD BRUTA: L. ${utilidadBruta.toFixed(2)}
-        4. GASTOS OPERATIVOS: L. ${totalGastos.toFixed(2)}
-        5. UTILIDAD NETA: L. ${utilidadNeta.toFixed(2)}
+        3. UTILIDAD BRUTA: Lp. ${utilidadBruta.toFixed(2)}
+        4. GASTOS OPERATIVOS: Lp. ${totalGastos.toFixed(2)}
+        5. UTILIDAD NETA: Lp. ${utilidadNeta.toFixed(2)}
         
         Dame 3 observaciones financieras breves y una recomendación para mejorar la rentabilidad.
       `;
@@ -122,18 +122,18 @@ export const Dashboard: React.FC = () => {
     doc.setFontSize(10);
     doc.text(`Generado: ${new Date().toLocaleDateString('es-HN')}`, 105, 28, { align: "center" });
     doc.text(`Periodo Base: ${periodName}`, 105, 33, { align: "center" });
-    doc.text(`Moneda: Lempiras (HNL)`, 105, 38, { align: "center" });
+    doc.text(`Moneda: Lempiras (Lp.)`, 105, 38, { align: "center" });
 
     const bodyData = [
-      ["INGRESOS POR VENTAS", "", `L. ${ingresosTotales.toFixed(2)}`],
-      ["(-) Costo de Ventas", "", `(L. ${costoDeVentasReal.toFixed(2)})`],
+      ["INGRESOS POR VENTAS", "", `Lp. ${ingresosTotales.toFixed(2)}`],
+      ["(-) Costo de Ventas", "", `(Lp. ${costoDeVentasReal.toFixed(2)})`],
       [{content: `  Inv. Inicial (${periodName}): ${valorInventarioInicial.toFixed(2)} | Compras: ${comprasNetas.toFixed(2)} | Inv. Final (Stock Actual): ${valorInventarioFinal.toFixed(2)}`, colSpan: 3, styles: { fontSize: 8, fontStyle: 'italic', textColor: 100 }}],
-      ["UTILIDAD BRUTA", "", `L. ${utilidadBruta.toFixed(2)}`],
+      ["UTILIDAD BRUTA", "", `Lp. ${utilidadBruta.toFixed(2)}`],
       ["", "", ""],
-      ["GASTOS OPERATIVOS", "", `(L. ${totalGastos.toFixed(2)})`],
-      ...expenses.map(e => [`  - ${e.category}: ${e.description}`, `L. ${e.amount.toFixed(2)}`, ""]),
+      ["GASTOS OPERATIVOS", "", `(Lp. ${totalGastos.toFixed(2)})`],
+      ...expenses.map(e => [`  - ${e.category}: ${e.description}`, `Lp. ${e.amount.toFixed(2)}`, ""]),
       ["", "", ""],
-      ["UTILIDAD NETA", "", `L. ${utilidadNeta.toFixed(2)}`],
+      ["UTILIDAD NETA", "", `Lp. ${utilidadNeta.toFixed(2)}`],
     ];
 
     autoTable(doc, {
@@ -185,7 +185,7 @@ export const Dashboard: React.FC = () => {
                         <p className="text-xs text-gray-500">Facturación total bruta</p>
                     </div>
                 </div>
-                <p className="text-xl font-bold text-slate-800">L. {ingresosTotales.toFixed(2)}</p>
+                <p className="text-xl font-bold text-slate-800">Lp. {ingresosTotales.toFixed(2)}</p>
             </div>
 
             {/* 2. Costo de Ventas */}
@@ -200,25 +200,25 @@ export const Dashboard: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <p className="text-xl font-bold text-red-500">(L. {costoDeVentasReal.toFixed(2)})</p>
+                <p className="text-xl font-bold text-red-500">(Lp. {costoDeVentasReal.toFixed(2)})</p>
             </div>
 
             {/* 3. Utilidad Bruta */}
             <div className="flex justify-between items-center bg-blue-50 p-3 rounded border border-blue-100">
                 <p className="font-bold text-blue-800">(=) UTILIDAD BRUTA</p>
-                <p className="text-xl font-bold text-blue-800">L. {utilidadBruta.toFixed(2)}</p>
+                <p className="text-xl font-bold text-blue-800">Lp. {utilidadBruta.toFixed(2)}</p>
             </div>
 
             {/* 4. Gastos */}
             <div className="flex justify-between items-center border-b pb-2 pt-2">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-red-100 rounded text-red-600"><DollarSign size={20}/></div>
+                    <div className="w-9 h-9 bg-red-100 rounded text-red-600 flex items-center justify-center font-bold text-xl">L</div>
                     <div>
                         <p className="font-bold text-slate-700">(-) Gastos Operativos</p>
                         <p className="text-xs text-gray-500">Servicios, Planilla, Alquiler, etc.</p>
                     </div>
                 </div>
-                <p className="text-xl font-bold text-red-500">(L. {totalGastos.toFixed(2)})</p>
+                <p className="text-xl font-bold text-red-500">(Lp. {totalGastos.toFixed(2)})</p>
             </div>
 
              {/* 5. Utilidad Neta */}
@@ -227,7 +227,7 @@ export const Dashboard: React.FC = () => {
                     <p className="font-extrabold text-lg">(=) UTILIDAD NETA</p>
                     <p className="text-xs opacity-75">Antes de Impuestos</p>
                 </div>
-                <p className="text-3xl font-extrabold">L. {utilidadNeta.toFixed(2)}</p>
+                <p className="text-3xl font-extrabold">Lp. {utilidadNeta.toFixed(2)}</p>
             </div>
         </div>
       </div>
@@ -241,7 +241,7 @@ export const Dashboard: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`L. ${value}`, 'Ventas']} />
+                <Tooltip formatter={(value) => [`Lp. ${value}`, 'Ventas']} />
                 <Bar dataKey="ventas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getSales, getExpenses, getPurchases } from '../services/db';
 import { Sale, Expense, Purchase } from '../types';
-import { FileDown, Calendar, DollarSign, ShoppingBag, Truck } from 'lucide-react';
+import { FileDown, Calendar, ShoppingBag, Truck } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -51,7 +51,7 @@ export const Reports: React.FC<ReportsProps> = ({ notify }) => {
       new Date(s.created_at).toLocaleDateString(),
       s.id.slice(0, 8),
       s.payment_method,
-      `L. ${s.total_amount.toFixed(2)}`
+      `Lp. ${s.total_amount.toFixed(2)}`
     ]);
     exportPDF("Reporte de Ventas", ["Fecha", "ID Venta", "Método Pago", "Total"], data);
   };
@@ -61,7 +61,7 @@ export const Reports: React.FC<ReportsProps> = ({ notify }) => {
       new Date(p.created_at).toLocaleDateString(),
       p.supplier_name,
       p.items.length,
-      `L. ${p.total_amount.toFixed(2)}`
+      `Lp. ${p.total_amount.toFixed(2)}`
     ]);
     exportPDF("Reporte de Compras", ["Fecha", "Proveedor", "Items", "Total"], data);
   };
@@ -71,7 +71,7 @@ export const Reports: React.FC<ReportsProps> = ({ notify }) => {
       new Date(e.created_at).toLocaleDateString(),
       e.description,
       e.category,
-      `L. ${e.amount.toFixed(2)}`
+      `Lp. ${e.amount.toFixed(2)}`
     ]);
     exportPDF("Reporte de Gastos", ["Fecha", "Descripción", "Categoría", "Monto"], data);
   };
@@ -100,7 +100,7 @@ export const Reports: React.FC<ReportsProps> = ({ notify }) => {
           onClick={() => setActiveTab('expenses')}
           className={`pb-2 px-4 flex items-center gap-2 ${activeTab === 'expenses' ? 'border-b-2 border-blue-600 text-blue-600 font-bold' : 'text-gray-500'}`}
         >
-          <DollarSign size={18} /> Gastos
+          <span className="font-bold text-lg">L</span> Gastos
         </button>
       </div>
 
@@ -134,7 +134,7 @@ export const Reports: React.FC<ReportsProps> = ({ notify }) => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 font-semibold">{sale.payment_method}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-emerald-600">L. {sale.total_amount.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-emerald-600">Lp. {sale.total_amount.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -169,7 +169,7 @@ export const Reports: React.FC<ReportsProps> = ({ notify }) => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap font-medium">{purchase.supplier_name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">{purchase.items.length}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-red-600">L. {purchase.total_amount.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-red-600">Lp. {purchase.total_amount.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -206,7 +206,7 @@ export const Reports: React.FC<ReportsProps> = ({ notify }) => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">{expense.category}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-red-600">L. {expense.amount.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right font-bold text-red-600">Lp. {expense.amount.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>

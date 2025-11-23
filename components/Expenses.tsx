@@ -61,7 +61,7 @@ export const Expenses: React.FC<ExpensesProps> = ({ notify }) => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Monto (L.)</label>
+              <label className="block text-sm font-medium text-gray-700">Monto (Lp.)</label>
               <input 
                 required
                 type="number" 
@@ -121,7 +121,7 @@ export const Expenses: React.FC<ExpensesProps> = ({ notify }) => {
                       </span>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-red-600 font-bold">
-                      L. {expense.amount.toFixed(2)}
+                      Lp. {expense.amount.toFixed(2)}
                     </td>
                   </tr>
                 ))}
