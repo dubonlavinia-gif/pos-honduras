@@ -1,4 +1,11 @@
 
+-- API KEYS Y CONFIGURACIÓN SUPABASE (Referencia)
+-- Project ID: Jtfwjbipjyzywrnlwsnf
+-- URL: https://Jtfwjbipjyzywrnlwsnf.supabase.co
+-- Service Role Key (Solo para admin): [REDACTED]
+
+-- INSTRUCCIONES: Copia y pega todo el contenido de abajo en el SQL Editor de Supabase
+
 create extension if not exists pgcrypto;
 
 -- 1. Tabla de Productos
@@ -8,6 +15,7 @@ create table if not exists products (
   name text not null,
   description text,
   sku text,
+  category text default 'Abarrotes', -- Categoría estandarizada
   cost_price numeric(10, 2) default 0 not null, -- Costo Promedio
   sell_price numeric(10, 2) default 0 not null, -- Precio de Venta
   stock integer default 0 not null,
@@ -107,3 +115,25 @@ create policy "Acceso publico gastos" on expenses for all using (true);
 
 drop policy if exists "Acceso publico inventario inicial" on initial_inventory;
 create policy "Acceso publico inventario inicial" on initial_inventory for all using (true);
+
+
+-- =========================================================
+-- CORRECCIÓN CRÍTICA DE CATEGORÍAS
+-- Ejecuta esto para evitar el error "row violates check constraint"
+-- =========================================================
+
+-- 1. Eliminar cualquier restricción vieja en la columna category
+ALTER TABLE products DROP CONSTRAINT IF EXISTS products_category_check;
+
+-- 2. Asegurar que la columna sea tipo TEXT libre (para aceptar 'Agua y Refrescos', etc.)
+ALTER TABLE products ALTER COLUMN category TYPE text;
+
+-- 3. Script para normalizar datos viejos (Opcional pero recomendado)
+UPDATE products SET category = 'Agua y Refrescos' WHERE category ILIKE '%bebidas%';
+UPDATE products SET category = 'Higiene del Hogar' WHERE category ILIKE '%limpieza%';
+UPDATE products 
+SET category = 'Abarrotes' 
+WHERE category NOT IN (
+  'Carnes', 'Lácteos', 'Vegetales', 'Frutas', 'Higiene Personal', 
+  'Higiene del Hogar', 'Agua y Refrescos', 'Panadería', 'Abarrotes'
+);

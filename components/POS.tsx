@@ -1,7 +1,8 @@
+
 import React, { useEffect, useState } from 'react';
 import { getProducts, createSale } from '../services/db';
-import { Product, CartItem, Sale } from '../types';
-import { Search, ShoppingCart, Trash2, CheckCircle, Plus, Minus, Printer, Receipt } from 'lucide-react';
+import { Product, CartItem, Sale, PRODUCT_CATEGORIES } from '../types';
+import { Search, ShoppingCart, Trash2, CheckCircle, Plus, Minus, Printer, Receipt, Beef, Milk, Carrot, Apple, SprayCan, Home, Droplets, Croissant, ShoppingBag, LayoutGrid } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -9,10 +10,24 @@ interface POSProps {
   notify: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
+// Mapeo visual de iconos para las categorías OFICIALES
+const CATEGORY_ICONS: Record<string, React.ReactNode> = {
+  'Carnes': <Beef size={16} />,
+  'Lácteos': <Milk size={16} />,
+  'Vegetales': <Carrot size={16} />,
+  'Frutas': <Apple size={16} />,
+  'Higiene Personal': <SprayCan size={16} />,
+  'Higiene del Hogar': <Home size={16} />,
+  'Agua y Refrescos': <Droplets size={16} />,
+  'Panadería': <Croissant size={16} />,
+  'Abarrotes': <ShoppingBag size={16} />,
+};
+
 export const POS: React.FC<POSProps> = ({ notify }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Todo');
   const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA'>('EFECTIVO');
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -84,7 +99,6 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
     doc.text(`Fecha: ${new Date(sale.created_at).toLocaleString()}`, 40, 23, { align: 'center' });
 
     // Need to cast items because sale.items might come from DB structure or local mapping
-    // Assuming sale object passed here matches the structure
     const rows = sale.items.map((item: any) => [
       item.product_name.substring(0, 15),
       item.quantity.toString(),
@@ -130,8 +144,6 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
       const newSale = await createSale(saleData);
       
       if (newSale) {
-        // Set the newly created sale as the "last sale" for the modal
-        // Note: The backend returns the sale header, we need to merge items to print immediately
         const fullSale: any = { ...newSale, items: saleData.items, created_at: new Date().toISOString() };
         setLastSale(fullSale);
         
@@ -148,45 +160,104 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
     }
   };
 
-  const filteredProducts = products.filter(p => 
-    (p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Filtrado de productos basado en las categorías seleccionadas
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          p.sku.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCategory = selectedCategory === 'Todo' 
+                            ? true 
+                            : p.category === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-100px)] gap-6">
       {/* Product List (Left) */}
       <div className="flex-1 flex flex-col space-y-4">
-        <h2 className="text-xl font-bold text-slate-800">Catálogo de Productos</h2>
         
-        <div className="relative">
-          <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-          <input 
-            type="text"
-            placeholder="Buscar producto..."
-            className="w-full pl-10 pr-4 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        {/* Top Bar: Search + Category Tabs */}
+        <div className="space-y-3 bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+            <div className="relative">
+                <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+                <input 
+                    type="text"
+                    placeholder="Buscar producto por nombre o código..."
+                    className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+            
+            {/* Categories Scroll / Tabs */}
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                <button
+                    onClick={() => setSelectedCategory('Todo')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-all
+                        ${selectedCategory === 'Todo' 
+                            ? 'bg-slate-900 text-white shadow-md' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                    <LayoutGrid size={16} />
+                    Todo
+                </button>
+                {/* Generación dinámica de pestañas basada en la LISTA OFICIAL */}
+                {PRODUCT_CATEGORIES.map(cat => (
+                    <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-all
+                            ${selectedCategory === cat 
+                                ? 'bg-blue-600 text-white shadow-md' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    >
+                        {CATEGORY_ICONS[cat] || <ShoppingBag size={16}/>}
+                        {cat}
+                    </button>
+                ))}
+            </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 content-start">
-          {filteredProducts.map(product => (
-            <div 
-              key={product.id} 
-              onClick={() => addToCart(product)}
-              className={`p-4 bg-white rounded-lg shadow border hover:border-blue-400 cursor-pointer transition-all ${product.stock === 0 ? 'opacity-50 grayscale pointer-events-none' : ''}`}
-            >
-              <h3 className="font-semibold text-slate-800 truncate">{product.name}</h3>
-              <p className="text-xs text-gray-500 mb-2">SKU: {product.sku}</p>
-              <div className="flex justify-between items-end">
-                <span className="text-lg font-bold text-emerald-600">L. {product.sell_price.toFixed(2)}</span>
-                <span className={`text-xs px-2 py-1 rounded-full ${product.stock > 5 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                  Stock: {product.stock}
-                </span>
-              </div>
-            </div>
-          ))}
+        {/* Grid de Productos */}
+        <div className="flex-1 overflow-y-auto pr-2">
+            {filteredProducts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                    <ShoppingBag size={48} className="mb-2 opacity-50"/>
+                    <p>No se encontraron productos en esta categoría.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 content-start pb-4">
+                {filteredProducts.map(product => (
+                    <div 
+                    key={product.id} 
+                    onClick={() => addToCart(product)}
+                    className={`p-3 bg-white rounded-lg shadow border hover:border-blue-400 cursor-pointer transition-all flex flex-col justify-between h-full relative group
+                        ${product.stock === 0 ? 'opacity-50 grayscale pointer-events-none' : ''}`}
+                    >
+                        {product.stock === 0 && (
+                             <span className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-50 font-bold text-red-600 z-10">AGOTADO</span>
+                        )}
+                        <div>
+                            <div className="flex justify-between items-start mb-1">
+                                <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider truncate max-w-[100px]">
+                                    {product.category || 'GEN'}
+                                </span>
+                            </div>
+                            <h3 className="font-semibold text-slate-800 leading-tight mb-1 line-clamp-2">{product.name}</h3>
+                            <p className="text-xs text-gray-400 font-mono mb-2">{product.sku}</p>
+                        </div>
+                        
+                        <div className="flex justify-between items-end mt-2">
+                            <span className="text-lg font-bold text-emerald-600">L. {product.sell_price.toFixed(2)}</span>
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${product.stock > 5 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            Stk: {product.stock}
+                            </span>
+                        </div>
+                    </div>
+                ))}
+                </div>
+            )}
         </div>
       </div>
 

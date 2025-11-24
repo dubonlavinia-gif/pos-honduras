@@ -1,3 +1,4 @@
+
 import { supabase } from '../supabaseClient';
 import { Product, Sale, Purchase, Expense, InitialInventory } from '../types';
 
@@ -46,6 +47,7 @@ export const saveProduct = async (product: Omit<Product, 'id'> & { id?: string }
         name: product.name,
         sku: product.sku,
         description: product.description,
+        category: product.category,
         cost_price: product.cost_price,
         sell_price: product.sell_price,
         stock: product.stock,
@@ -60,6 +62,7 @@ export const saveProduct = async (product: Omit<Product, 'id'> & { id?: string }
         name: product.name,
         sku: product.sku,
         description: product.description,
+        category: product.category,
         cost_price: product.cost_price,
         sell_price: product.sell_price,
         stock: product.stock,
@@ -309,11 +312,13 @@ export const seedData = async () => {
     const products = await getProducts();
     if (products.length === 0) {
         console.log("Seeding initial data...");
+        // Updated to use OFFICIAL CATEGORIES
         const initialProducts = [
-            { name: 'Aceite 10W30 Galón', sku: 'ACE-1030', cost_price: 450.00, sell_price: 650.00, stock: 20, min_stock: 5 },
-            { name: 'Filtro de Aceite Toyota', sku: 'FIL-TOY', cost_price: 120.00, sell_price: 250.00, stock: 15, min_stock: 3 },
-            { name: 'Bujía NGK', sku: 'BUJ-NGK', cost_price: 45.00, sell_price: 85.00, stock: 100, min_stock: 20 },
-            { name: 'Líquido de Frenos DOT3', sku: 'LIQ-FRN', cost_price: 60.00, sell_price: 120.00, stock: 30, min_stock: 5 },
+            { name: 'Tajo de Res', sku: 'CAR-0001', category: 'Carnes', cost_price: 80.00, sell_price: 120.00, stock: 15, min_stock: 5 },
+            { name: 'Leche Entera', sku: 'LAC-0001', category: 'Lácteos', cost_price: 25.00, sell_price: 32.00, stock: 50, min_stock: 10 },
+            { name: 'Pan Molde Blanco', sku: 'PAN-0001', category: 'Panadería', cost_price: 35.00, sell_price: 50.00, stock: 20, min_stock: 5 },
+            { name: 'Refresco Cola 3L', sku: 'BEB-0001', category: 'Agua y Refrescos', cost_price: 45.00, sell_price: 60.00, stock: 30, min_stock: 8 },
+            { name: 'Jabón de Baño', sku: 'PER-0001', category: 'Higiene Personal', cost_price: 15.00, sell_price: 25.00, stock: 40, min_stock: 10 },
         ];
         
         const { error } = await supabase.from('products').insert(initialProducts);

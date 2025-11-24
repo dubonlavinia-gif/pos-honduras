@@ -4,6 +4,7 @@ export interface Product {
   name: string;
   sku: string;
   description?: string;
+  category?: string;
   cost_price: number; // Costo promedio ponderado
   sell_price: number;
   stock: number;
@@ -61,3 +62,32 @@ export interface InitialInventory {
 }
 
 export type PageView = 'dashboard' | 'pos' | 'products' | 'purchases' | 'expenses' | 'initial_inventory' | 'reports' | 'configuration';
+
+// --- CONSTANTES GLOBALES DE CATEGORÍAS (LISTA OFICIAL) ---
+
+export const PRODUCT_CATEGORIES = [
+  'Carnes',
+  'Lácteos',
+  'Vegetales',
+  'Frutas',
+  'Higiene Personal',
+  'Higiene del Hogar',
+  'Agua y Refrescos',
+  'Panadería',
+  'Abarrotes'
+] as const;
+
+export type ProductCategory = typeof PRODUCT_CATEGORIES[number];
+
+// Prefijos para generación de SKU
+export const CATEGORY_PREFIXES: Record<ProductCategory, string> = {
+  'Carnes': 'CAR',
+  'Lácteos': 'LAC',
+  'Vegetales': 'VEG',
+  'Frutas': 'FRU',
+  'Higiene Personal': 'PER',
+  'Higiene del Hogar': 'HOG',
+  'Agua y Refrescos': 'BEB',
+  'Panadería': 'PAN',
+  'Abarrotes': 'ABA',
+};
