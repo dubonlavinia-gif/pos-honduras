@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { getProducts, createSale } from '../services/db';
 import { Product, CartItem, Sale, PRODUCT_CATEGORIES } from '../types';
-import { Search, ShoppingCart, Trash2, CheckCircle, Plus, Minus, Printer, Receipt, Beef, Milk, Carrot, Apple, SprayCan, Home, Droplets, Croissant, ShoppingBag, LayoutGrid } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, CheckCircle, Plus, Minus, Printer, Receipt, Beef, Milk, Carrot, Apple, SprayCan, Home, Droplets, Croissant, ShoppingBag, LayoutGrid, Zap } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -33,6 +33,11 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Estados para Venta Manual (Rápida)
+  const [manualName, setManualName] = useState('');
+  const [manualPrice, setManualPrice] = useState('');
+  const [manualQty, setManualQty] = useState('1');
+
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -48,11 +53,11 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
       return;
     }
 
-    const existingItem = cart.find(item => item.id === product.id);
+    const existingItem = cart.find(item => item.product_id === product.id);
     if (existingItem) {
-      if (existingItem.quantity < product.stock) {
+      if ((existingItem.quantity + 1) <= product.stock) {
         setCart(cart.map(item => 
-          item.id === product.id 
+          item.product_id === product.id 
             ? { ...item, quantity: item.quantity + 1 }
             : item
         ));
@@ -60,8 +65,48 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
         notify("No hay más stock disponible de este producto", "error");
       }
     } else {
-      setCart([...cart, { ...product, quantity: 1 }]);
+      setCart([...cart, { 
+        id: product.id, 
+        product_id: product.id,
+        name: product.name,
+        sku: product.sku,
+        sell_price: product.sell_price,
+        cost_price: product.cost_price,
+        quantity: 1,
+        stock: product.stock,
+        isManual: false
+      }]);
     }
+  };
+
+  const addManualItem = () => {
+    if (!manualName || !manualPrice || !manualQty) {
+        notify("Complete los datos de venta manual", "error");
+        return;
+    }
+    const price = parseFloat(manualPrice);
+    const qty = parseInt(manualQty);
+
+    if (isNaN(price) || isNaN(qty) || price <= 0 || qty <= 0) {
+        notify("Precio o cantidad inválidos", "error");
+        return;
+    }
+
+    const manualItem: CartItem = {
+        id: `manual-${Date.now()}`, // ID temporal
+        product_id: null, // No vinculado a inventario
+        name: manualName,
+        sell_price: price,
+        cost_price: 0, // Costo 0 para ventas manuales (o podría estimarse)
+        quantity: qty,
+        isManual: true,
+        stock: 9999 // Ilimitado visualmente
+    };
+
+    setCart([...cart, manualItem]);
+    setManualName('');
+    setManualPrice('');
+    setManualQty('1');
   };
 
   const removeFromCart = (id: string) => {
@@ -72,7 +117,8 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
     setCart(cart.map(item => {
       if (item.id === id) {
         const newQty = item.quantity + delta;
-        if (newQty > 0 && newQty <= item.stock) {
+        // Si es manual, no validamos stock máximo
+        if (newQty > 0 && (item.isManual || (item.stock && newQty <= item.stock))) {
           return { ...item, quantity: newQty };
         }
       }
@@ -88,7 +134,7 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
     const doc = new jsPDF({
       orientation: 'p',
       unit: 'mm',
-      format: [80, 200] // Ticket format width 80mm
+      format: [80, 200]
     });
 
     doc.setFontSize(12);
@@ -98,7 +144,6 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
     doc.text(`ID: ${sale.id.slice(0, 8)}`, 40, 19, { align: 'center' });
     doc.text(`Fecha: ${new Date(sale.created_at).toLocaleString()}`, 40, 23, { align: 'center' });
 
-    // Need to cast items because sale.items might come from DB structure or local mapping
     const rows = sale.items.map((item: any) => [
       item.product_name.substring(0, 15),
       item.quantity.toString(),
@@ -133,11 +178,11 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
         total_amount: cartTotal,
         payment_method: paymentMethod,
         items: cart.map(item => ({
-          product_id: item.id,
+          product_id: item.product_id || null, // Importante: Puede ser null
           product_name: item.name,
           quantity: item.quantity,
           unit_price: item.sell_price,
-          unit_cost: item.cost_price // Snapshot of cost
+          unit_cost: item.cost_price
         }))
       };
 
@@ -148,19 +193,18 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
         setLastSale(fullSale);
         
         setCart([]);
-        await fetchProducts(); // Refresh stock from DB
+        await fetchProducts(); // Refresh stock
         setShowSuccessModal(true);
         notify("Venta registrada correctamente", "success");
       }
     } catch (error) {
       console.error("Error during checkout:", error);
-      notify("Hubo un error al procesar la venta.", "error");
+      notify("Hubo un error al procesar la venta. Verifique la base de datos.", "error");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Filtrado de productos basado en las categorías seleccionadas
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           p.sku.toLowerCase().includes(searchTerm.toLowerCase());
@@ -177,20 +221,58 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
       {/* Product List (Left) */}
       <div className="flex-1 flex flex-col space-y-4">
         
-        {/* Top Bar: Search + Category Tabs */}
+        {/* === ZONA DE VENTA RÁPIDA / MANUAL === */}
+        <div className="bg-amber-50 p-4 rounded-xl shadow-sm border border-amber-200">
+            <h3 className="text-sm font-bold text-amber-800 flex items-center gap-2 mb-2">
+                <Zap size={16} className="text-amber-600"/> Venta Rápida / Libre (Escribir producto sin registrar)
+            </h3>
+            <div className="flex flex-col md:flex-row gap-2">
+                <input 
+                    type="text" 
+                    placeholder="Descripción (ej. Coca Cola)" 
+                    className="flex-1 border rounded p-2 text-sm"
+                    value={manualName}
+                    onChange={e => setManualName(e.target.value)}
+                />
+                <div className="flex gap-2 w-full md:w-auto">
+                    <input 
+                        type="number" 
+                        placeholder="Precio" 
+                        className="w-24 border rounded p-2 text-sm"
+                        value={manualPrice}
+                        onChange={e => setManualPrice(e.target.value)}
+                    />
+                    <input 
+                        type="number" 
+                        placeholder="Cant." 
+                        className="w-16 border rounded p-2 text-sm"
+                        value={manualQty}
+                        onChange={e => setManualQty(e.target.value)}
+                    />
+                    <button 
+                        onClick={addManualItem}
+                        className="bg-amber-500 hover:bg-amber-600 text-white p-2 rounded"
+                    >
+                        <Plus size={20} />
+                    </button>
+                </div>
+            </div>
+        </div>
+        {/* ========================================= */}
+
+        {/* Search & Categories */}
         <div className="space-y-3 bg-white p-3 rounded-xl shadow-sm border border-gray-100">
             <div className="relative">
                 <Search className="absolute left-3 top-3 text-gray-400" size={20} />
                 <input 
                     type="text"
-                    placeholder="Buscar producto por nombre o código..."
+                    placeholder="Buscar en inventario..."
                     className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
             </div>
             
-            {/* Categories Scroll / Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 <button
                     onClick={() => setSelectedCategory('Todo')}
@@ -202,7 +284,6 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
                     <LayoutGrid size={16} />
                     Todo
                 </button>
-                {/* Generación dinámica de pestañas basada en la LISTA OFICIAL */}
                 {PRODUCT_CATEGORIES.map(cat => (
                     <button
                         key={cat}
@@ -224,7 +305,7 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
             {filteredProducts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400">
                     <ShoppingBag size={48} className="mb-2 opacity-50"/>
-                    <p>No se encontraron productos en esta categoría.</p>
+                    <p>No se encontraron productos.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 content-start pb-4">
@@ -241,7 +322,7 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
                         <div>
                             <div className="flex justify-between items-start mb-1">
                                 <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider truncate max-w-[100px]">
-                                    {product.category || 'GEN'}
+                                    {product.category || ''}
                                 </span>
                             </div>
                             <h3 className="font-semibold text-slate-800 leading-tight mb-1 line-clamp-2">{product.name}</h3>
@@ -277,9 +358,12 @@ export const POS: React.FC<POSProps> = ({ notify }) => {
             </div>
           ) : (
             cart.map(item => (
-              <div key={item.id} className="flex items-center justify-between p-2 border-b">
+              <div key={item.id} className={`flex items-center justify-between p-2 border-b ${item.isManual ? 'bg-amber-50' : ''}`}>
                 <div className="flex-1">
-                  <p className="font-medium text-sm truncate">{item.name}</p>
+                  <p className="font-medium text-sm truncate">
+                    {item.isManual && <Zap size={10} className="inline text-amber-500 mr-1"/>}
+                    {item.name}
+                  </p>
                   <p className="text-xs text-gray-500">L. {item.sell_price.toFixed(2)} c/u</p>
                 </div>
                 <div className="flex items-center gap-3">

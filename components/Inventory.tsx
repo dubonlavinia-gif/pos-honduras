@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { getProducts, saveProduct } from '../services/db';
 import { Product, CATEGORY_PREFIXES, PRODUCT_CATEGORIES, ProductCategory } from '../types';
@@ -16,15 +15,24 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
   const [loading, setLoading] = useState(false);
 
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    category: string;
+    sku: string;
+    cost_price: string | number;
+    sell_price: string | number;
+    stock: string | number;
+    min_stock: string | number;
+  }>({
     name: '',
     description: '',
     category: '', 
     sku: '',
-    cost_price: 0,
-    sell_price: 0,
-    stock: 0,
-    min_stock: 5
+    cost_price: '',
+    sell_price: '',
+    stock: '',
+    min_stock: ''
   });
 
   useEffect(() => {
@@ -38,28 +46,21 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
     setLoading(false);
   };
 
-  // Generador de SKU Secuencial Inteligente
-  const generateSequentialSku = (category: string): string => {
-    // Validar que la categoría sea válida según nuestra lista oficial
-    if (!Object.keys(CATEGORY_PREFIXES).includes(category)) return '';
+  // Lógica OBLIGATORIA: Prefijo de Categoría + Aleatorio
+  const generateSkuFromCategory = (category: string): string => {
+    if (!category) return '';
     
+    // 1. Obtener prefijo exacto del mapa
     const prefix = CATEGORY_PREFIXES[category as ProductCategory];
-
-    // Filtrar productos que tengan este prefijo
-    const categoryProducts = products.filter(p => p.sku && p.sku.startsWith(prefix + '-'));
     
-    // Extraer los números
-    const numbers = categoryProducts.map(p => {
-      const parts = p.sku.split('-');
-      // Asumimos formato PREFIJO-XXXX
-      return parts.length > 1 ? parseInt(parts[1]) : 0;
-    }).filter(n => !isNaN(n));
+    // Si la categoría no está en el mapa, usar GEN (fallback de seguridad)
+    if (!prefix) return `GEN-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
-    const nextNumber = maxNumber + 1;
-
-    // Formatear con 4 dígitos (0001, 0002, etc.)
-    return `${prefix}-${nextNumber.toString().padStart(4, '0')}`;
+    // 2. Generar número aleatorio de 4 dígitos (ej: 8392)
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    
+    // 3. Retornar formato PREFIX-NUMBER
+    return `${prefix}-${randomNum}`;
   };
 
   const handleOpenModal = (product?: Product) => {
@@ -77,83 +78,114 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
       });
     } else {
       setEditingProduct(null);
-      // Valores por defecto
       setFormData({ 
         name: '', 
         description: '',
-        category: '', // Obligar al usuario a elegir
+        category: '', 
         sku: '', 
-        cost_price: 0, 
-        sell_price: 0, 
-        stock: 0, 
-        min_stock: 5 
+        cost_price: '', 
+        sell_price: '', 
+        stock: '', 
+        min_stock: '' 
       });
     }
     setIsModalOpen(true);
   };
 
+  // Manejador del Selector de Categoría
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newCategory = e.target.value;
     
-    // Si estamos editando y ya tiene un SKU, NO cambiarlo automáticamente a menos que sea explícito (aquí protegemos el SKU existente)
-    // Si estamos creando un nuevo producto, O si el SKU está vacío, generar uno nuevo basado en el prefijo
+    // Solo regeneramos el SKU si estamos creando un producto nuevo o el usuario lo desea explícitamente
+    // Si estamos editando, respetamos el SKU existente a menos que se quiera cambiar manualmente
     if (!editingProduct && newCategory) {
-       const newSku = generateSequentialSku(newCategory);
-       setFormData({ ...formData, category: newCategory, sku: newSku });
+       const newSku = generateSkuFromCategory(newCategory);
+       setFormData(prev => ({ 
+           ...prev, 
+           category: newCategory, 
+           sku: newSku // Actualización INMEDIATA del SKU
+       }));
     } else {
-       setFormData({ ...formData, category: newCategory });
+       setFormData(prev => ({ ...prev, category: newCategory }));
     }
+  };
+
+  const regenerateSku = () => {
+      if (!formData.category) {
+          alert("Seleccione una categoría primero.");
+          return;
+      }
+      const newSku = generateSkuFromCategory(formData.category);
+      setFormData(prev => ({ ...prev, sku: newSku }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
     try {
+      // Validación básica
       if (!formData.category) {
-        notify("Por favor selecciona una categoría de la lista oficial", "error");
+        alert("Error: Debes seleccionar una categoría obligatoriamente.");
         setLoading(false);
         return;
       }
 
-      // Validar SKU si se modificó manualmente
-      const finalSku = formData.sku.trim();
-      if (finalSku) {
-        const exists = products.some(p => p.sku === finalSku && p.id !== editingProduct?.id);
-        if (exists) {
-            notify("El código SKU ya existe. Intenta generar otro.", "error");
-            setLoading(false);
-            return;
-        }
-      } else {
-        // Fallback: Generar si está vacío
-        const generated = generateSequentialSku(formData.category);
-        if(!generated) {
-            notify("Error generando SKU. Seleccione categoría nuevamente.", "error");
-            setLoading(false);
-            return;
-        }
+      // Sanitización de números
+      const costClean = parseFloat(Number(formData.cost_price).toString());
+      const sellClean = parseFloat(Number(formData.sell_price).toString());
+      const stockClean = parseInt(Number(formData.stock).toString());
+      const minStockClean = parseInt(Number(formData.min_stock).toString());
+
+      if (isNaN(costClean) || isNaN(sellClean)) {
+        alert("Error: Costo o Precio de venta inválidos.");
+        setLoading(false);
+        return;
       }
 
-      // LIMPIEZA DE DATOS NUMÉRICOS
-      // Convertimos explícitamente a Number para evitar problemas de strings o ceros a la izquierda
-      await saveProduct({
-        ...formData,
+      // Asegurar SKU final
+      let finalSku = formData.sku.trim();
+      if (!finalSku) {
+         finalSku = generateSkuFromCategory(formData.category);
+      }
+
+      const productPayload = {
+        name: formData.name.trim(),
         sku: finalSku,
-        cost_price: Number(formData.cost_price),
-        sell_price: Number(formData.sell_price),
-        stock: Number(formData.stock),
-        min_stock: Number(formData.min_stock),
+        description: formData.description?.trim() || '', // Enviar vacío si no hay
+        category: formData.category,
+        cost_price: costClean,
+        sell_price: sellClean,
+        stock: stockClean,
+        min_stock: minStockClean,
         id: editingProduct?.id
-      });
+      };
+
+      console.log("Enviando a Supabase:", productPayload);
+
+      await saveProduct(productPayload);
 
       setIsModalOpen(false);
       await loadProducts();
-      notify(editingProduct ? "Producto actualizado" : `Producto creado: ${finalSku}`, "success");
+      window.alert("¡Producto guardado correctamente!");
+      
     } catch (error: any) {
-      console.error("Error saving product detailed:", error);
-      // Extraemos el mensaje real del error para mostrarlo
-      const errorMsg = error.message || error.error_description || JSON.stringify(error);
-      notify(`Error al guardar: ${errorMsg}`, "error");
+      console.error("Error Supabase CRÍTICO:", error);
+      
+      // Extracción robusta del mensaje de error para evitar [object Object]
+      let errorMessage = "Error desconocido";
+      let errorDetails = "";
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+         errorMessage = error.message || error.error_description || JSON.stringify(error);
+         errorDetails = error.details || error.hint || "";
+      } else {
+         errorMessage = String(error);
+      }
+      
+      window.alert(`ERROR BASE DE DATOS:\n${errorMessage}\n${errorDetails ? '\nDetalles: ' + errorDetails : ''}\n\n(IMPORTANTE: Ejecuta el script SQL en Supabase para crear la columna 'description')`);
     } finally {
       setLoading(false);
     }
@@ -177,7 +209,6 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
         </button>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-3 text-gray-400" size={20} />
         <input 
@@ -189,7 +220,6 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
         />
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {loading && products.length === 0 ? (
           <div className="p-8 text-center text-gray-500">Cargando inventario...</div>
@@ -234,7 +264,6 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
         )}
       </div>
 
-      {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
@@ -246,7 +275,7 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
                     <label className="block text-sm font-medium text-gray-700">Categoría Oficial <span className="text-red-500">*</span></label>
                     <select 
                         required
-                        className="mt-1 w-full border rounded p-2 bg-blue-50 border-blue-200 font-medium"
+                        className="mt-1 w-full border rounded p-2 bg-blue-50 border-blue-200 font-medium cursor-pointer"
                         value={formData.category}
                         onChange={handleCategoryChange}
                     >
@@ -255,7 +284,6 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
                             <option key={cat} value={cat}>{cat}</option>
                         ))}
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">El SKU se generará automáticamente según la categoría (ej: CAR-0001).</p>
                   </div>
               </div>
 
@@ -267,6 +295,7 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
                   className="mt-1 w-full border rounded p-2"
                   value={formData.name}
                   onChange={e => setFormData({...formData, name: e.target.value})}
+                  placeholder="Ej. Coca Cola 3L"
                 />
               </div>
               
@@ -277,6 +306,7 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
                   className="mt-1 w-full border rounded p-2"
                   value={formData.description}
                   onChange={e => setFormData({...formData, description: e.target.value})}
+                  placeholder="Detalles adicionales (Opcional)"
                 />
               </div>
 
@@ -286,11 +316,20 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
                   <input 
                     type="text" 
                     readOnly
-                    className="mt-1 w-full border rounded p-2 bg-gray-100 font-mono text-slate-600 font-bold"
+                    className="mt-1 w-full border rounded p-2 bg-gray-100 font-mono text-slate-800 font-bold border-gray-300"
                     value={formData.sku}
-                    placeholder="Se genera al elegir categoría"
+                    placeholder="Seleccione Categoría para generar"
                   />
+                   <button 
+                    type="button" 
+                    onClick={regenerateSku}
+                    className="bg-gray-200 px-3 rounded text-gray-600 hover:bg-gray-300"
+                    title="Regenerar Código"
+                   >
+                       <RefreshCw size={16}/>
+                   </button>
                 </div>
+                <p className="text-xs text-gray-400 mt-1">Formato: PREFIJO + NÚMERO ALEATORIO</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -301,9 +340,10 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
                     type="number" 
                     step="0.01"
                     min="0"
+                    placeholder="0.00"
                     className="mt-1 w-full border rounded p-2"
                     value={formData.cost_price}
-                    onChange={e => setFormData({...formData, cost_price: e.target.value ? parseFloat(e.target.value) : 0})}
+                    onChange={e => setFormData({...formData, cost_price: e.target.value})}
                   />
                 </div>
                 <div>
@@ -313,9 +353,10 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
                     type="number" 
                     step="0.01"
                     min="0"
+                    placeholder="0.00"
                     className="mt-1 w-full border rounded p-2"
                     value={formData.sell_price}
-                    onChange={e => setFormData({...formData, sell_price: e.target.value ? parseFloat(e.target.value) : 0})}
+                    onChange={e => setFormData({...formData, sell_price: e.target.value})}
                   />
                 </div>
               </div>
@@ -326,9 +367,10 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
                     required
                     type="number" 
                     min="0"
+                    placeholder="0"
                     className="mt-1 w-full border rounded p-2"
                     value={formData.stock}
-                    onChange={e => setFormData({...formData, stock: e.target.value ? parseInt(e.target.value) : 0})}
+                    onChange={e => setFormData({...formData, stock: e.target.value})}
                   />
                 </div>
                 <div>
@@ -337,9 +379,10 @@ export const Inventory: React.FC<InventoryProps> = ({ notify }) => {
                     required
                     type="number" 
                     min="0"
+                    placeholder="5"
                     className="mt-1 w-full border rounded p-2"
                     value={formData.min_stock}
-                    onChange={e => setFormData({...formData, min_stock: e.target.value ? parseInt(e.target.value) : 0})}
+                    onChange={e => setFormData({...formData, min_stock: e.target.value})}
                   />
                 </div>
               </div>

@@ -1,4 +1,3 @@
-
 import { supabase } from '../supabaseClient';
 import { Product, Sale, Purchase, Expense, InitialInventory } from '../types';
 
@@ -9,7 +8,7 @@ const mapSaleData = (data: any[]): Sale[] => {
     ...sale,
     items: sale.sale_items.map((item: any) => ({
       ...item,
-      product_name: item.products?.name || 'Producto Desconocido',
+      product_name: item.product_name || item.products?.name || 'Venta Manual',
     })),
   }));
 };
@@ -40,34 +39,31 @@ export const getProducts = async (): Promise<Product[]> => {
 };
 
 export const saveProduct = async (product: Omit<Product, 'id'> & { id?: string }) => {
+  // Construir payload limpio
+  const payload: any = {
+    name: product.name,
+    sku: product.sku,
+    description: product.description || '', // Asegurar que no sea undefined
+    category: product.category,
+    cost_price: product.cost_price,
+    sell_price: product.sell_price,
+    stock: product.stock,
+    min_stock: product.min_stock
+  };
+
   if (product.id) {
+    // Si es edición, usamos el ID para actualizar
     const { error } = await supabase
       .from('products')
-      .update({
-        name: product.name,
-        sku: product.sku,
-        description: product.description,
-        category: product.category,
-        cost_price: product.cost_price,
-        sell_price: product.sell_price,
-        stock: product.stock,
-        min_stock: product.min_stock
-      })
+      .update(payload)
       .eq('id', product.id);
     if (error) throw error;
   } else {
+    // Si es inserción, NO enviamos el ID en el payload para que Supabase lo genere
+    delete payload.id;
     const { error } = await supabase
       .from('products')
-      .insert([{
-        name: product.name,
-        sku: product.sku,
-        description: product.description,
-        category: product.category,
-        cost_price: product.cost_price,
-        sell_price: product.sell_price,
-        stock: product.stock,
-        min_stock: product.min_stock
-      }]);
+      .insert([payload]);
     if (error) throw error;
   }
 };
@@ -128,6 +124,7 @@ export const getSales = async (): Promise<Sale[]> => {
 };
 
 export const createSale = async (saleData: Omit<Sale, 'id' | 'created_at'>): Promise<Sale | null> => {
+  // 1. Crear encabezado de venta
   const { data: sale, error: saleError } = await supabase
     .from('sales')
     .insert([{
@@ -142,9 +139,12 @@ export const createSale = async (saleData: Omit<Sale, 'id' | 'created_at'>): Pro
     throw saleError;
   }
 
+  // 2. Preparar items para insertar
+  // NOTA CRÍTICA: Si es manual, product_id va NULL y se guarda product_name
   const itemsToInsert = saleData.items.map(item => ({
     sale_id: sale.id,
-    product_id: item.product_id,
+    product_id: item.product_id, // Puede ser null
+    product_name: item.product_name, // Guardamos el nombre explícitamente
     quantity: item.quantity,
     unit_price: item.unit_price,
     unit_cost: item.unit_cost
@@ -154,21 +154,27 @@ export const createSale = async (saleData: Omit<Sale, 'id' | 'created_at'>): Pro
     .from('sale_items')
     .insert(itemsToInsert);
 
-  if (itemsError) throw itemsError;
+  if (itemsError) {
+    console.error("Error creating sale items:", itemsError);
+    throw itemsError;
+  }
 
+  // 3. Descontar inventario (SOLO si es un producto registrado y tiene ID)
   for (const item of saleData.items) {
-    const { data: product } = await supabase
-      .from('products')
-      .select('stock')
-      .eq('id', item.product_id)
-      .single();
-    
-    if (product) {
-      const newStock = Math.max(0, product.stock - item.quantity);
-      await supabase
+    if (item.product_id) { // Solo si NO es null
+        const { data: product } = await supabase
         .from('products')
-        .update({ stock: newStock })
-        .eq('id', item.product_id);
+        .select('stock')
+        .eq('id', item.product_id)
+        .single();
+        
+        if (product) {
+        const newStock = Math.max(0, product.stock - item.quantity);
+        await supabase
+            .from('products')
+            .update({ stock: newStock })
+            .eq('id', item.product_id);
+        }
     }
   }
 
@@ -314,11 +320,11 @@ export const seedData = async () => {
         console.log("Seeding initial data...");
         // Updated to use OFFICIAL CATEGORIES
         const initialProducts = [
-            { name: 'Tajo de Res', sku: 'CAR-0001', category: 'Carnes', cost_price: 80.00, sell_price: 120.00, stock: 15, min_stock: 5 },
-            { name: 'Leche Entera', sku: 'LAC-0001', category: 'Lácteos', cost_price: 25.00, sell_price: 32.00, stock: 50, min_stock: 10 },
-            { name: 'Pan Molde Blanco', sku: 'PAN-0001', category: 'Panadería', cost_price: 35.00, sell_price: 50.00, stock: 20, min_stock: 5 },
-            { name: 'Refresco Cola 3L', sku: 'BEB-0001', category: 'Agua y Refrescos', cost_price: 45.00, sell_price: 60.00, stock: 30, min_stock: 8 },
-            { name: 'Jabón de Baño', sku: 'PER-0001', category: 'Higiene Personal', cost_price: 15.00, sell_price: 25.00, stock: 40, min_stock: 10 },
+            { name: 'Tajo de Res', sku: 'CAR-0001', category: 'Carnes', cost_price: 80.00, sell_price: 120.00, stock: 15, min_stock: 5, description: '' },
+            { name: 'Leche Entera', sku: 'LAC-0001', category: 'Lácteos', cost_price: 25.00, sell_price: 32.00, stock: 50, min_stock: 10, description: '' },
+            { name: 'Pan Molde Blanco', sku: 'PAN-0001', category: 'Panadería', cost_price: 35.00, sell_price: 50.00, stock: 20, min_stock: 5, description: '' },
+            { name: 'Refresco Cola 3L', sku: 'BEB-0001', category: 'Agua y Refrescos', cost_price: 45.00, sell_price: 60.00, stock: 30, min_stock: 8, description: '' },
+            { name: 'Jabón de Baño', sku: 'PER-0001', category: 'Higiene Personal', cost_price: 15.00, sell_price: 25.00, stock: 40, min_stock: 10, description: '' },
         ];
         
         const { error } = await supabase.from('products').insert(initialProducts);

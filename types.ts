@@ -11,8 +11,17 @@ export interface Product {
   min_stock: number;
 }
 
-export interface CartItem extends Product {
+export interface CartItem {
+  id: string; // Puede ser UUID de DB o un timestamp para manuales
+  product_id?: string | null; // ID real de DB (opcional para manuales)
+  name: string;
+  sku?: string;
+  category?: string;
+  sell_price: number;
+  cost_price: number;
   quantity: number;
+  stock?: number; // Stock disponible (si es de inventario)
+  isManual?: boolean; // Bandera para saber si es venta libre
 }
 
 export interface Sale {
@@ -24,7 +33,7 @@ export interface Sale {
 }
 
 export interface SaleItem {
-  product_id: string;
+  product_id: string | null;
   product_name: string;
   quantity: number;
   unit_price: number;
@@ -79,7 +88,7 @@ export const PRODUCT_CATEGORIES = [
 
 export type ProductCategory = typeof PRODUCT_CATEGORIES[number];
 
-// Prefijos para generación de SKU
+// Prefijos OBLIGATORIOS para generación de SKU
 export const CATEGORY_PREFIXES: Record<ProductCategory, string> = {
   'Carnes': 'CAR',
   'Lácteos': 'LAC',
